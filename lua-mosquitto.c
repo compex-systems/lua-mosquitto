@@ -163,16 +163,11 @@ static void ctx__on_clear(ctx_t *ctx)
 static int mosq_new(lua_State *L)
 {
 	const char *id = luaL_optstring(L, 1, NULL);
-	bool clean_session = (lua_isboolean(L, 2) ? lua_toboolean(L, 2) : true);
-
-	if (id == NULL && !clean_session) {
-		return luaL_argerror(L, 2, "if 'id' is nil then 'clean session' must be true");
-	}
 
 	ctx_t *ctx = (ctx_t *) lua_newuserdata(L, sizeof(ctx_t));
 
 	/* ctx will be passed as void *obj arg in the callback functions */
-	ctx->mosq = mosquitto_new(id, clean_session, ctx);
+	ctx->mosq = mosquitto_new(id, ctx);
 
 	if (ctx->mosq == NULL) {
 		return luaL_error(L, strerror(errno));
@@ -239,8 +234,9 @@ static int ctx_will_set(lua_State *L)
 
 	int qos = luaL_optinteger(L, 4, 0);
 	bool retain = lua_toboolean(L, 5);
+	bool will = true;
 
-	int rc = mosquitto_will_set(ctx->mosq, topic, payloadlen, payload, qos, retain);
+	int rc = mosquitto_will_set(ctx->mosq, will, topic, payloadlen, payload, qos, retain);
 	return mosq__pstatus(L, rc);
 }
 
@@ -291,8 +287,9 @@ static int ctx_connect(lua_State *L)
 	const char *host = luaL_optstring(L, 2, "localhost");
 	int port = luaL_optinteger(L, 3, 1883);
 	int keepalive = luaL_optinteger(L, 4, 60);
+	bool clean_session = (lua_isboolean(L, 5) ? lua_toboolean(L, 5) : true);
 
-	int rc =  mosquitto_connect(ctx->mosq, host, port, keepalive);
+	int rc =  mosquitto_connect(ctx->mosq, host, port, keepalive, clean_session);
 	return mosq__pstatus(L, rc);
 }
 
@@ -390,7 +387,7 @@ static int mosq_loop(lua_State *L, bool forever)
 	if (forever) {
 		rc = mosquitto_loop_forever(ctx->mosq, timeout, max_packets);
 	} else {
-		rc = mosquitto_loop(ctx->mosq, timeout, max_packets);
+		rc = mosquitto_loop(ctx->mosq, timeout);
 	}
 	return mosq__pstatus(L, rc);
 }
@@ -444,7 +441,7 @@ static int ctx_loop_read(lua_State *L)
 	ctx_t *ctx = ctx_check(L, 1);
 	int max_packets = luaL_optinteger(L, 2, 1);
 
-	int rc = mosquitto_loop_read(ctx->mosq, max_packets);
+	int rc = mosquitto_loop_read(ctx->mosq);
 	return mosq__pstatus(L, rc);
 }
 
@@ -453,7 +450,7 @@ static int ctx_loop_write(lua_State *L)
 	ctx_t *ctx = ctx_check(L, 1);
 	int max_packets = luaL_optinteger(L, 2, 1);
 
-	int rc = mosquitto_loop_write(ctx->mosq, max_packets);
+	int rc = mosquitto_loop_write(ctx->mosq);
 	return mosq__pstatus(L, rc);
 }
 
